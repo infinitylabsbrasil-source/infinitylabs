@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Painel Geral</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e8e8e4;
+    --text: #1a1a18;
+    --muted: #888880;
+    --accent: #2d5a27;
+    --accent-light: #eaf2e8;
+    --accent-mid: #4a8f42;
+    --danger: #c0392b;
+    --danger-light: #fdf0ee;
+    --warning: #d4780a;
+    --warning-light: #fef6ea;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; width: 100%; max-width: 380px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  }
+  .login-logo { font-size: 13px; font-weight: 500; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .login-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: var(--radius); font-family: inherit; font-size: 14px;
+    background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .btn-primary {
+    width: 100%; padding: 11px; background: var(--accent); color: white;
+    border: none; border-radius: var(--radius); font-family: inherit;
+    font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--accent-mid); }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center; }
+
+  /* LAYOUT PRINCIPAL */
+  #app { display: none; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 24px 0; display: flex; flex-direction: column; z-index: 10;
+  }
+  .sidebar-brand { padding: 0 20px 24px; border-bottom: 1px solid var(--border); }
+  .sidebar-brand .tag { font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; }
+  .sidebar-brand .name { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .sidebar-brand .role { font-size: 12px; color: var(--muted); }
+  .sidebar-nav { padding: 16px 12px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;
+    color: var(--muted); transition: all 0.15s; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid var(--border); }
+  .btn-logout {
+    width: 100%; padding: 9px; background: none; border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--muted);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+  .page-header { margin-bottom: 28px; }
+  .page-title { font-size: 20px; font-weight: 600; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* CARDS MÉTRICAS */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .metric-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+  }
+  .metric-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .metric-value { font-size: 26px; font-weight: 600; margin-top: 6px; font-family: 'DM Mono', monospace; }
+  .metric-value.green { color: var(--accent); }
+  .metric-value.red { color: var(--danger); }
+  .metric-value.orange { color: var(--warning); }
+
+  /* SECTIONS */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 24px; }
+  .section-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-title { font-size: 14px; font-weight: 600; }
+  .section-body { padding: 20px; }
+
+  /* FORMULÁRIO PRODUTO */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-field label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .form-field input, .form-field select, .form-field textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s;
+  }
+  .form-field input:focus, .form-field select:focus { border-color: var(--accent); }
+  .btn-add {
+    padding: 9px 18px; background: var(--accent); color: white; border: none;
+    border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-add:hover { background: var(--accent-mid); }
+  .btn-danger {
+    padding: 5px 10px; background: none; border: 1px solid var(--border);
+    border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--muted);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-danger:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-light); }
+
+  /* TABELA */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 10px; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 12px 0; vertical-align: middle; }
+  .badge {
+    display: inline-block; padding: 3px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
+  }
+  .badge-green { background: var(--accent-light); color: var(--accent); }
+  .badge-red { background: var(--danger-light); color: var(--danger); }
+  .badge-orange { background: var(--warning-light); color: var(--warning); }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; width: fit-content; }
+  .tab {
+    padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    cursor: pointer; color: var(--muted); transition: all 0.15s; border: none; background: none; font-family: inherit;
+  }
+  .tab.active { background: var(--accent); color: white; }
+
+  .hidden { display: none !important; }
+  .msg { font-size: 13px; color: var(--muted); text-align: center; padding: 24px; }
+
+  /* LUCRO DESTAQUE */
+  .profit-row { background: var(--accent-light); }
+  .profit-row td { color: var(--accent); font-weight: 500; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; }
+    .sidebar-brand, .nav-item span, .sidebar-footer { display: none; }
+    .main { margin-left: 60px; padding: 20px; }
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⬡ Sistema</div>
+    <div class="login-title">Painel Admin</div>
+    <div class="login-sub">Acesso restrito ao administrador</div>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="login-email" placeholder="seu@email.com">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="••••••••">
+    </div>
+    <button class="btn-primary" onclick="fazerLogin()">Entrar</button>
+    <div class="login-error hidden" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="tag">⬡ Admin</div>
+      <div class="name">Painel Geral</div>
+      <div class="role" id="user-email-display"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="mostrarPagina('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('produtos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <span>Produtos</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('pedidos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Pedidos</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('relatorio')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+        <span>Relatório</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('comissoes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span>Comissões</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div id="pg-dashboard">
+      <div class="page-header">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Visão geral do negócio</div>
+      </div>
+      <div class="metrics">
+        <div class="metric-card">
+          <div class="metric-label">Total vendido</div>
+          <div class="metric-value" id="m-vendas">R$ 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Lucro total</div>
+          <div class="metric-value green" id="m-lucro">R$ 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Custo total</div>
+          <div class="metric-value red" id="m-custo">R$ 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Pedidos</div>
+          <div class="metric-value" id="m-pedidos">0</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Últimos pedidos</div>
+        </div>
+        <div class="section-body">
+          <table>
+            <thead><tr>
+              <th>Cliente</th><th>Representante</th><th>Valor</th><th>Lucro</th><th>Data</th><th>Status</th>
+            </tr></thead>
+            <tbody id="tabela-pedidos-dash"></tbody>
+          </table>
+          <div class="msg hidden" id="msg-pedidos-dash">Nenhum pedido ainda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div id="pg-produtos" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Produtos</div>
+        <div class="page-sub">Cadastre e gerencie seu catálogo de suplementos</div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Novo produto</div></div>
+        <div class="section-body">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label>Nome do produto</label>
+              <input type="text" id="p-nome" placeholder="Ex: Whey Protein 900g Baunilha">
+            </div>
+            <div class="form-field">
+              <label>Categoria</label>
+              <select id="p-cat">
+                <option>Whey Protein</option>
+                <option>Creatina</option>
+                <option>Pré-treino</option>
+                <option>BCAA</option>
+                <option>Vitaminas</option>
+                <option>Colágeno</option>
+                <option>Outro</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Sabor / Variação</label>
+              <input type="text" id="p-sabor" placeholder="Ex: Baunilha, 900g">
+            </div>
+            <div class="form-field">
+              <label>Custo (R$)</label>
+              <input type="number" id="p-custo" placeholder="0,00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Preço de venda (R$)</label>
+              <input type="number" id="p-preco" placeholder="0,00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Estoque inicial</label>
+              <input type="number" id="p-estoque" placeholder="0">
+            </div>
+            <div class="form-field" style="display:flex;align-items:flex-end;">
+              <button class="btn-add" onclick="adicionarProduto()">+ Adicionar produto</button>
+            </div>
+          </div>
+          <div id="msg-prod" style="font-size:13px;margin-top:12px;"></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Catálogo</div></div>
+        <div class="section-body">
+          <table>
+            <thead><tr>
+              <th>Produto</th><th>Categoria</th><th>Custo</th><th>Preço</th><th>Margem</th><th>Estoque</th><th></th>
+            </tr></thead>
+            <tbody id="tabela-produtos"></tbody>
+          </table>
+          <div class="msg hidden" id="msg-cat">Nenhum produto cadastrado.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PEDIDOS -->
+    <div id="pg-pedidos" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Pedidos</div>
+        <div class="page-sub">Todos os pedidos lançados pelos representantes</div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Lista de pedidos</div></div>
+        <div class="section-body">
+          <table>
+            <thead><tr>
+              <th>Cliente</th><th>Representante</th><th>Itens</th><th>Valor total</th><th>Custo</th><th>Lucro</th><th>Data</th>
+            </tr></thead>
+            <tbody id="tabela-todos-pedidos"></tbody>
+          </table>
+          <div class="msg hidden" id="msg-todos-pedidos">Nenhum pedido ainda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELATÓRIO -->
+    <div id="pg-relatorio" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Relatório financeiro</div>
+        <div class="page-sub">Resumo completo de receitas, custos e lucros</div>
+      </div>
+      <div class="metrics">
+        <div class="metric-card">
+          <div class="metric-label">Receita bruta</div>
+          <div class="metric-value" id="r-receita">R$ 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Custo total</div>
+          <div class="metric-value red" id="r-custo">R$ 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Lucro líquido</div>
+          <div class="metric-value green" id="r-lucro">R$ 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Margem média</div>
+          <div class="metric-value orange" id="r-margem">0%</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Produto mais vendido</div></div>
+        <div class="section-body">
+          <table>
+            <thead><tr><th>Produto</th><th>Qtd vendida</th><th>Receita</th><th>Lucro gerado</th></tr></thead>
+            <tbody id="tabela-relatorio"></tbody>
+          </table>
+          <div class="msg hidden" id="msg-relatorio">Sem dados ainda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMISSÕES -->
+    <div id="pg-comissoes" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Demonstrativo de Comissões</div>
+        <div class="page-sub">Configure e visualize as comissões dos representantes por mês</div>
+      </div>
+
+      <!-- Configuração de comissão -->
+      <div class="section" style="margin-bottom:24px">
+        <div class="section-header"><div class="section-title">Configuração de Comissão</div></div>
+        <div class="section-body">
+          <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+            <div class="form-field" style="flex:1;min-width:200px">
+              <label>Representante (e-mail)</label>
+              <input type="email" id="cfg-rep-email" placeholder="email@representante.com">
+            </div>
+            <div class="form-field" style="width:140px">
+              <label>Comissão (%)</label>
+              <input type="number" id="cfg-rep-pct" placeholder="Ex: 5" min="0" max="100" step="0.1">
+            </div>
+            <div style="padding-bottom:1px">
+              <button class="btn-add" onclick="salvarComissao()">Salvar</button>
+            </div>
+          </div>
+          <div id="msg-comissao-cfg" style="font-size:13px;margin-top:10px;"></div>
+          <div id="lista-comissoes-cfg" style="margin-top:20px"></div>
+        </div>
+      </div>
+
+      <!-- Seletor de mês -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Demonstrativo Mensal</div>
+          <input type="month" id="mes-comissao" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);outline:none;cursor:pointer">
+        </div>
+        <div class="section-body">
+          <div id="demo-comissao-admin">
+            <div class="msg">Selecione um mês para exibir o demonstrativo.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURAÇÃO FIREBASE — substitua pelos seus dados
+// ============================================================
+const firebaseConfig = {
+  apiKey: "COLE_SUA_API_KEY",
+  authDomain: "COLE_SEU_AUTH_DOMAIN",
+  projectId: "COLE_SEU_PROJECT_ID",
+  storageBucket: "COLE_SEU_STORAGE_BUCKET",
+  messagingSenderId: "COLE_SEU_MESSAGING_ID",
+  appId: "COLE_SEU_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ============================================================
+// LOGIN
+// ============================================================
+function fazerLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(e => {
+      document.getElementById('login-error').textContent = 'E-mail ou senha inválidos.';
+      document.getElementById('login-error').classList.remove('hidden');
+    });
+}
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') fazerLogin(); });
+
+function sair() { auth.signOut(); }
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    // Verificar se é admin
+    const snap = await db.collection('usuarios').doc(user.uid).get();
+    if (!snap.exists || snap.data().perfil !== 'admin') {
+      alert('Acesso negado. Este painel é exclusivo para administradores.');
+      auth.signOut(); return;
+    }
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('user-email-display').textContent = user.email;
+    iniciar();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+// ============================================================
+// NAVEGAÇÃO
+// ============================================================
+function mostrarPagina(id) {
+  ['dashboard','produtos','pedidos','relatorio','comissoes'].forEach(p => {
+    document.getElementById('pg-'+p).classList.add('hidden');
+  });
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.remove('hidden');
+  event.currentTarget.classList.add('active');
+  if (id === 'relatorio') calcularRelatorio();
+  if (id === 'comissoes') carregarComissoes();
+}
+
+// ============================================================
+// PRODUTOS
+// ============================================================
+async function adicionarProduto() {
+  const nome = document.getElementById('p-nome').value.trim();
+  const cat = document.getElementById('p-cat').value;
+  const sabor = document.getElementById('p-sabor').value.trim();
+  const custo = parseFloat(document.getElementById('p-custo').value);
+  const preco = parseFloat(document.getElementById('p-preco').value);
+  const estoque = parseInt(document.getElementById('p-estoque').value) || 0;
+  const msg = document.getElementById('msg-prod');
+  if (!nome || isNaN(custo) || isNaN(preco)) {
+    msg.textContent = 'Preencha nome, custo e preço.'; msg.style.color = 'var(--danger)'; return;
+  }
+  try {
+    await db.collection('produtos').add({
+      nome, categoria: cat, sabor, custo, preco, estoque,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    msg.textContent = 'Produto adicionado!'; msg.style.color = 'var(--accent)';
+    ['p-nome','p-sabor','p-custo','p-preco','p-estoque'].forEach(id => document.getElementById(id).value = '');
+    setTimeout(() => msg.textContent = '', 3000);
+  } catch(e) { msg.textContent = 'Erro ao salvar.'; msg.style.color = 'var(--danger)'; }
+}
+
+async function excluirProduto(id) {
+  if (!confirm('Excluir produto?')) return;
+  await db.collection('produtos').doc(id).delete();
+}
+
+function renderProdutos(docs) {
+  const tbody = document.getElementById('tabela-produtos');
+  const msg = document.getElementById('msg-cat');
+  if (docs.length === 0) { tbody.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  tbody.innerHTML = docs.map(d => {
+    const margem = d.preco > 0 ? Math.round((d.preco - d.custo) / d.preco * 100) : 0;
+    const cor = d.estoque > 10 ? 'badge-green' : d.estoque > 0 ? 'badge-orange' : 'badge-red';
+    return `<tr>
+      <td><strong>${d.nome}</strong>${d.sabor ? '<br><span style="color:var(--muted);font-size:12px">'+d.sabor+'</span>' : ''}</td>
+      <td>${d.categoria}</td>
+      <td>R$ ${d.custo.toFixed(2)}</td>
+      <td>R$ ${d.preco.toFixed(2)}</td>
+      <td><span class="badge badge-green">${margem}%</span></td>
+      <td><span class="badge ${cor}">${d.estoque} un</span></td>
+      <td><button class="btn-danger" onclick="excluirProduto('${d.id}')">Excluir</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// PEDIDOS
+// ============================================================
+function renderPedidosDash(docs) {
+  const tbody = document.getElementById('tabela-pedidos-dash');
+  const msg = document.getElementById('msg-pedidos-dash');
+  if (docs.length === 0) { tbody.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  const ultimos = docs.slice(0, 10);
+  tbody.innerHTML = ultimos.map(d => {
+    const data = d.criadoEm ? new Date(d.criadoEm.seconds*1000).toLocaleDateString('pt-BR') : '—';
+    return `<tr>
+      <td>${d.clienteNome}</td>
+      <td>${d.representanteEmail || '—'}</td>
+      <td>R$ ${(d.total||0).toFixed(2)}</td>
+      <td style="color:var(--accent)">R$ ${(d.lucro||0).toFixed(2)}</td>
+      <td>${data}</td>
+      <td><span class="badge badge-green">${d.status || 'Confirmado'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTodosPedidos(docs) {
+  const tbody = document.getElementById('tabela-todos-pedidos');
+  const msg = document.getElementById('msg-todos-pedidos');
+  if (docs.length === 0) { tbody.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  tbody.innerHTML = docs.map(d => {
+    const data = d.criadoEm ? new Date(d.criadoEm.seconds*1000).toLocaleDateString('pt-BR') : '—';
+    const itens = (d.itens||[]).map(i => i.nome).join(', ');
+    return `<tr>
+      <td>${d.clienteNome}</td>
+      <td>${d.representanteEmail||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${itens}</td>
+      <td>R$ ${(d.total||0).toFixed(2)}</td>
+      <td style="color:var(--danger)">R$ ${(d.custo||0).toFixed(2)}</td>
+      <td style="color:var(--accent);font-weight:500">R$ ${(d.lucro||0).toFixed(2)}</td>
+      <td>${data}</td>
+    </tr>`;
+  }).join('');
+}
+
+function atualizarMetricasDash(docs) {
+  const totalVendas = docs.reduce((s,d) => s + (d.total||0), 0);
+  const totalLucro = docs.reduce((s,d) => s + (d.lucro||0), 0);
+  const totalCusto = docs.reduce((s,d) => s + (d.custo||0), 0);
+  document.getElementById('m-vendas').textContent = 'R$ ' + totalVendas.toFixed(2);
+  document.getElementById('m-lucro').textContent = 'R$ ' + totalLucro.toFixed(2);
+  document.getElementById('m-custo').textContent = 'R$ ' + totalCusto.toFixed(2);
+  document.getElementById('m-pedidos').textContent = docs.length;
+}
+
+// ============================================================
+// RELATÓRIO
+// ============================================================
+function calcularRelatorio() {
+  db.collection('pedidos').get().then(snap => {
+    const pedidos = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    const receita = pedidos.reduce((s,d) => s+(d.total||0),0);
+    const custo = pedidos.reduce((s,d) => s+(d.custo||0),0);
+    const lucro = receita - custo;
+    const margem = receita > 0 ? (lucro/receita*100).toFixed(1) : 0;
+    document.getElementById('r-receita').textContent = 'R$ '+receita.toFixed(2);
+    document.getElementById('r-custo').textContent = 'R$ '+custo.toFixed(2);
+    document.getElementById('r-lucro').textContent = 'R$ '+lucro.toFixed(2);
+    document.getElementById('r-margem').textContent = margem+'%';
+
+    // Produtos mais vendidos
+    const mapa = {};
+    pedidos.forEach(p => (p.itens||[]).forEach(item => {
+      if (!mapa[item.nome]) mapa[item.nome] = {qty:0,receita:0,lucro:0};
+      mapa[item.nome].qty += item.quantidade||1;
+      mapa[item.nome].receita += item.subtotal||0;
+      mapa[item.nome].lucro += (item.subtotal||0) - (item.custoSubtotal||0);
+    }));
+    const lista = Object.entries(mapa).sort((a,b)=>b[1].qty-a[1].qty);
+    const tbody = document.getElementById('tabela-relatorio');
+    const msg = document.getElementById('msg-relatorio');
+    if (lista.length === 0) { tbody.innerHTML=''; msg.classList.remove('hidden'); return; }
+    msg.classList.add('hidden');
+    tbody.innerHTML = lista.map(([nome,v]) =>
+      `<tr><td>${nome}</td><td>${v.qty}</td><td>R$ ${v.receita.toFixed(2)}</td><td style="color:var(--accent)">R$ ${v.lucro.toFixed(2)}</td></tr>`
+    ).join('');
+  });
+}
+
+// ============================================================
+// LISTENERS EM TEMPO REAL
+// ============================================================
+function iniciar() {
+  db.collection('produtos').orderBy('criadoEm','desc').onSnapshot(snap => {
+    const docs = snap.docs.map(d => ({id:d.id,...d.data()}));
+    renderProdutos(docs);
+  });
+  db.collection('pedidos').orderBy('criadoEm','desc').onSnapshot(snap => {
+    const docs = snap.docs.map(d => ({id:d.id,...d.data()}));
+    atualizarMetricasDash(docs);
+    renderPedidosDash(docs);
+    renderTodosPedidos(docs);
+  });
+}
+
+// ============================================================
+// COMISSÕES
+// ============================================================
+let comissoesCache = {}; // email -> percentual
+
+async function salvarComissao() {
+  const email = document.getElementById('cfg-rep-email').value.trim().toLowerCase();
+  const pct = parseFloat(document.getElementById('cfg-rep-pct').value);
+  const msg = document.getElementById('msg-comissao-cfg');
+  if (!email) { msg.textContent = 'Informe o e-mail do representante.'; msg.style.color = 'var(--danger)'; return; }
+  if (isNaN(pct) || pct < 0 || pct > 100) { msg.textContent = 'Percentual inválido (0–100).'; msg.style.color = 'var(--danger)'; return; }
+  try {
+    await db.collection('comissoes').doc(email).set({ email, percentual: pct, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+    msg.textContent = '✓ Comissão salva com sucesso!'; msg.style.color = 'var(--accent)';
+    document.getElementById('cfg-rep-email').value = '';
+    document.getElementById('cfg-rep-pct').value = '';
+    setTimeout(() => msg.textContent = '', 3000);
+    carregarComissoes();
+  } catch(e) { msg.textContent = 'Erro ao salvar.'; msg.style.color = 'var(--danger)'; }
+}
+
+async function carregarComissoes() {
+  const snap = await db.collection('comissoes').get();
+  comissoesCache = {};
+  const el = document.getElementById('lista-comissoes-cfg');
+  if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Nenhuma comissão configurada ainda.</div>'; return; }
+  snap.docs.forEach(d => { comissoesCache[d.id] = d.data().percentual; });
+  el.innerHTML = `<table>
+    <thead><tr><th>Representante</th><th>Comissão (%)</th><th></th></tr></thead>
+    <tbody>${snap.docs.map(d => `
+      <tr>
+        <td>${d.data().email}</td>
+        <td><span class="badge badge-green">${d.data().percentual}%</span></td>
+        <td><button class="btn-danger" onclick="excluirComissao('${d.id}')">Remover</button></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+  // Atualiza o demonstrativo se já há mês selecionado
+  const mes = document.getElementById('mes-comissao').value;
+  if (mes) calcularDemonstrativoAdmin(mes);
+}
+
+async function excluirComissao(email) {
+  if (!confirm('Remover comissão de ' + email + '?')) return;
+  await db.collection('comissoes').doc(email).delete();
+  carregarComissoes();
+}
+
+async function calcularDemonstrativoAdmin(mes) {
+  const [ano, m] = mes.split('-').map(Number);
+  const inicio = new Date(ano, m - 1, 1);
+  const fim = new Date(ano, m, 1);
+  const snap = await db.collection('pedidos')
+    .where('criadoEm', '>=', firebase.firestore.Timestamp.fromDate(inicio))
+    .where('criadoEm', '<', firebase.firestore.Timestamp.fromDate(fim))
+    .get();
+  const pedidos = snap.docs.map(d => ({...d.data()}));
+
+  // Agrupar por representante
+  const porRep = {};
+  pedidos.forEach(p => {
+    const repEmail = (p.representanteEmail || 'desconhecido').toLowerCase();
+    if (!porRep[repEmail]) porRep[repEmail] = { total: 0, pedidos: 0 };
+    porRep[repEmail].total += p.total || 0;
+    porRep[repEmail].pedidos += 1;
+  });
+
+  const el = document.getElementById('demo-comissao-admin');
+  const nomeMes = inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  if (Object.keys(porRep).length === 0) {
+    el.innerHTML = `<div class="msg">Nenhum pedido encontrado em ${nomeMes}.</div>`;
+    return;
+  }
+
+  el.innerHTML = Object.entries(porRep).map(([email, dados]) => {
+    const pct = comissoesCache[email] || 0;
+    const comissao = dados.total * (pct / 100);
+    return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:600">${email}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${nomeMes} · ${dados.pedidos} pedido(s)</div>
+        </div>
+        <span class="badge ${pct > 0 ? 'badge-green' : 'badge-orange'}">${pct > 0 ? pct + '% de comissão' : 'Sem comissão configurada'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Total de vendas</div>
+          <div style="font-size:22px;font-weight:600;margin-top:4px;font-family:'DM Mono',monospace">R$ ${dados.total.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">% de comissão</div>
+          <div style="font-size:22px;font-weight:600;margin-top:4px;font-family:'DM Mono',monospace;color:var(--accent)">${pct}%</div>
+        </div>
+        <div style="background:var(--accent);border-radius:8px;padding:14px">
+          <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.06em">Valor da comissão</div>
+          <div style="font-size:22px;font-weight:600;margin-top:4px;font-family:'DM Mono',monospace;color:white">R$ ${comissao.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Define o mês atual como padrão
+  const hoje = new Date();
+  const mesAtual = hoje.toISOString().slice(0, 7);
+  const inputMes = document.getElementById('mes-comissao');
+  if (inputMes) {
+    inputMes.value = mesAtual;
+    inputMes.addEventListener('change', e => calcularDemonstrativoAdmin(e.target.value));
+  }
+});
+
+document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('login-pass').focus(); });
+</script>
+</body>
+</html>

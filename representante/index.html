@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Representante — Pedidos e Estoque</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e8e8e4;
+    --text: #1a1a18;
+    --muted: #888880;
+    --accent: #1a4a6b;
+    --accent-light: #e8f1f8;
+    --accent-mid: #2d6fa3;
+    --danger: #c0392b;
+    --danger-light: #fdf0ee;
+    --warning: #d4780a;
+    --warning-light: #fef6ea;
+    --green: #2d5a27;
+    --green-light: #eaf2e8;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+  .login-logo { font-size: 13px; font-weight: 500; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .login-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .field input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; font-size: 14px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .field input:focus { border-color: var(--accent); }
+  .btn-primary { width: 100%; padding: 11px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn-primary:hover { background: var(--accent-mid); }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center; }
+
+  #app { display: none; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 0; display: flex; flex-direction: column; z-index: 10; }
+  .sidebar-brand { padding: 0 20px 24px; border-bottom: 1px solid var(--border); }
+  .sidebar-brand .tag { font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; }
+  .sidebar-brand .name { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .sidebar-brand .role { font-size: 12px; color: var(--muted); }
+  .sidebar-nav { padding: 16px 12px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); transition: all 0.15s; margin-bottom: 2px; }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid var(--border); }
+  .btn-logout { width: 100%; padding: 9px; background: none; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+  .page-header { margin-bottom: 28px; }
+  .page-title { font-size: 20px; font-weight: 600; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 24px; }
+  .section-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-title { font-size: 14px; font-weight: 600; }
+  .section-body { padding: 20px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-field label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .form-field input, .form-field select, .form-field textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .form-field input:focus, .form-field select:focus { border-color: var(--accent); }
+  .form-field textarea { resize: vertical; min-height: 70px; }
+  .btn-add { padding: 9px 18px; background: var(--accent); color: white; border: none; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn-add:hover { background: var(--accent-mid); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 10px; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 12px 0; vertical-align: middle; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-orange { background: var(--warning-light); color: var(--warning); }
+  .badge-red { background: var(--danger-light); color: var(--danger); }
+  .badge-blue { background: var(--accent-light); color: var(--accent); }
+
+  /* CARRINHO DE PEDIDO */
+  .carrinho { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 16px; min-height: 60px; }
+  .carrinho-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .carrinho-item:last-child { border-bottom: none; }
+  .carrinho-total { font-size: 15px; font-weight: 600; margin-top: 12px; text-align: right; }
+  .btn-rm { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+  .btn-rm:hover { color: var(--danger); }
+  .btn-confirmar { width: 100%; margin-top: 12px; padding: 11px; background: var(--green); color: white; border: none; border-radius: 8px; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-confirmar:hover { opacity: 0.9; }
+
+  .produto-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .produto-card-info strong { font-size: 13px; font-weight: 500; }
+  .produto-card-info span { font-size: 12px; color: var(--muted); display: block; margin-top: 2px; }
+  .produto-card-right { display: flex; align-items: center; gap: 12px; }
+  .btn-sm { padding: 6px 14px; background: var(--accent); color: white; border: none; border-radius: 6px; font-family: inherit; font-size: 12px; cursor: pointer; }
+  .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+  .qty-input { width: 50px; text-align: center; padding: 5px; border: 1px solid var(--border); border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 13px; }
+
+  .hidden { display: none !important; }
+  .msg { font-size: 13px; color: var(--muted); text-align: center; padding: 24px; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; }
+    .sidebar-brand, .nav-item span, .sidebar-footer { display: none; }
+    .main { margin-left: 60px; padding: 20px; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⬡ Sistema</div>
+    <div class="login-title">Painel Representante</div>
+    <div class="login-sub">Estoque, clientes e pedidos</div>
+    <div class="field"><label>E-mail</label><input type="email" id="login-email" placeholder="seu@email.com"></div>
+    <div class="field"><label>Senha</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+    <button class="btn-primary" onclick="fazerLogin()">Entrar</button>
+    <div class="login-error hidden" id="login-error"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="tag">⬡ Rep.</div>
+      <div class="name">Representante</div>
+      <div class="role" id="user-email-display"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="mostrarPagina('estoque')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <span>Estoque</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('clientes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Clientes</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('pedido')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+        <span>Novo pedido</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('meus-pedidos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Meus pedidos</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('demonstrativo')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        <span>Demonstrativo</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <!-- ESTOQUE -->
+    <div id="pg-estoque">
+      <div class="page-header">
+        <div class="page-title">Estoque em tempo real</div>
+        <div class="page-sub">Visualize a disponibilidade de cada produto</div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Produtos disponíveis</div></div>
+        <div class="section-body">
+          <div id="lista-estoque"></div>
+          <div class="msg hidden" id="msg-estoque">Nenhum produto cadastrado ainda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div id="pg-clientes" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Clientes</div>
+        <div class="page-sub">Cadastre novos clientes e consulte os existentes</div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Novo cliente</div></div>
+        <div class="section-body">
+          <div class="form-grid">
+            <div class="form-field"><label>Nome completo</label><input type="text" id="c-nome" placeholder="Nome do cliente"></div>
+            <div class="form-field"><label>CPF / CNPJ</label><input type="text" id="c-doc" placeholder="000.000.000-00"></div>
+            <div class="form-field"><label>Telefone / WhatsApp</label><input type="tel" id="c-tel" placeholder="(00) 00000-0000"></div>
+            <div class="form-field"><label>E-mail</label><input type="email" id="c-email" placeholder="cliente@email.com"></div>
+            <div class="form-field full"><label>Endereço completo</label><input type="text" id="c-end" placeholder="Rua, número, bairro, cidade, UF"></div>
+            <div class="form-field full"><label>Observações</label><textarea id="c-obs" placeholder="Preferências, restrições, etc."></textarea></div>
+            <div class="form-field" style="display:flex;align-items:flex-end;">
+              <button class="btn-add" onclick="adicionarCliente()">+ Cadastrar cliente</button>
+            </div>
+          </div>
+          <div id="msg-cliente-form" style="font-size:13px;margin-top:12px;"></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Clientes cadastrados</div></div>
+        <div class="section-body">
+          <table>
+            <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Cidade</th></tr></thead>
+            <tbody id="tabela-clientes"></tbody>
+          </table>
+          <div class="msg hidden" id="msg-clientes-lista">Nenhum cliente ainda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOVO PEDIDO -->
+    <div id="pg-pedido" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Novo pedido</div>
+        <div class="page-sub">Selecione o cliente e os produtos</div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Cliente</div></div>
+        <div class="section-body">
+          <div class="form-field">
+            <label>Selecione o cliente</label>
+            <select id="pedido-cliente"><option value="">— Selecione —</option></select>
+          </div>
+          <div id="info-cliente" style="font-size:13px;color:var(--muted);margin-top:8px;"></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Produtos</div></div>
+        <div class="section-body">
+          <div id="lista-produtos-pedido"></div>
+          <div class="carrinho" id="carrinho">
+            <div style="font-size:13px;color:var(--muted);text-align:center;">Adicione produtos ao pedido</div>
+          </div>
+          <div class="form-field" style="margin-top:16px;">
+            <label>Observações do pedido</label>
+            <textarea id="pedido-obs" placeholder="Ex: Entregar na quinta-feira, cliente preferiu pagamento no PIX..."></textarea>
+          </div>
+          <button class="btn-confirmar" onclick="confirmarPedido()">✓ Confirmar pedido</button>
+          <div id="msg-pedido" style="font-size:13px;margin-top:12px;text-align:center;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEUS PEDIDOS -->
+    <div id="pg-meus-pedidos" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Meus pedidos</div>
+        <div class="page-sub">Pedidos lançados por você</div>
+      </div>
+      <div class="section">
+        <div class="section-header"><div class="section-title">Histórico</div></div>
+        <div class="section-body">
+          <table>
+            <thead><tr><th>Cliente</th><th>Itens</th><th>Valor total</th><th>Data</th><th>Status</th></tr></thead>
+            <tbody id="tabela-meus-pedidos"></tbody>
+          </table>
+          <div class="msg hidden" id="msg-meus-pedidos">Você ainda não lançou pedidos.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMONSTRATIVO -->
+    <div id="pg-demonstrativo" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Demonstrativo do Mês</div>
+        <div class="page-sub">Suas vendas e comissão referente ao período selecionado</div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Selecione o mês</div>
+          <input type="month" id="mes-demo-rep" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);outline:none;cursor:pointer">
+        </div>
+        <div class="section-body">
+          <div id="demo-rep-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px"></div>
+          <div id="demo-rep-tabela"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "COLE_SUA_API_KEY",
+  authDomain: "COLE_SEU_AUTH_DOMAIN",
+  projectId: "COLE_SEU_PROJECT_ID",
+  storageBucket: "COLE_SEU_STORAGE_BUCKET",
+  messagingSenderId: "COLE_SEU_MESSAGING_ID",
+  appId: "COLE_SEU_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let usuarioAtual = null;
+let produtosCache = [];
+let clientesCache = [];
+let carrinho = [];
+
+function fazerLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(() => {
+      document.getElementById('login-error').textContent = 'E-mail ou senha inválidos.';
+      document.getElementById('login-error').classList.remove('hidden');
+    });
+}
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') fazerLogin(); });
+function sair() { auth.signOut(); }
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    const snap = await db.collection('usuarios').doc(user.uid).get();
+    if (!snap.exists || snap.data().perfil !== 'representante') {
+      alert('Acesso negado. Este painel é exclusivo para representantes.');
+      auth.signOut(); return;
+    }
+    usuarioAtual = user;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('user-email-display').textContent = user.email;
+    iniciar();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+function mostrarPagina(id) {
+  ['estoque','clientes','pedido','meus-pedidos','demonstrativo'].forEach(p => document.getElementById('pg-'+p).classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.remove('hidden');
+  event.currentTarget.classList.add('active');
+  if (id === 'demonstrativo') {
+    const mes = document.getElementById('mes-demo-rep').value;
+    if (mes) calcularDemonstrativoRep(mes);
+  }
+}
+
+// ESTOQUE
+function renderEstoque(docs) {
+  const el = document.getElementById('lista-estoque');
+  const msg = document.getElementById('msg-estoque');
+  if (docs.length === 0) { el.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  el.innerHTML = docs.map(d => {
+    const cor = d.estoque > 10 ? 'badge-green' : d.estoque > 0 ? 'badge-orange' : 'badge-red';
+    const label = d.estoque > 10 ? 'Disponível' : d.estoque > 0 ? 'Pouco estoque' : 'Sem estoque';
+    return `<div class="produto-card">
+      <div class="produto-card-info">
+        <strong>${d.nome}</strong>
+        <span>${d.categoria}${d.sabor ? ' · ' + d.sabor : ''}</span>
+      </div>
+      <div class="produto-card-right">
+        <span style="font-family:'DM Mono',monospace;font-size:13px">${d.estoque} un</span>
+        <span class="badge ${cor}">${label}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// CLIENTES
+async function adicionarCliente() {
+  const nome = document.getElementById('c-nome').value.trim();
+  const doc = document.getElementById('c-doc').value.trim();
+  const tel = document.getElementById('c-tel').value.trim();
+  const email = document.getElementById('c-email').value.trim();
+  const end = document.getElementById('c-end').value.trim();
+  const obs = document.getElementById('c-obs').value.trim();
+  const msg = document.getElementById('msg-cliente-form');
+  if (!nome) { msg.textContent = 'Informe o nome do cliente.'; msg.style.color = 'var(--danger)'; return; }
+  try {
+    await db.collection('clientes').add({
+      nome, cpfCnpj: doc, telefone: tel, email, endereco: end, observacoes: obs,
+      representanteId: usuarioAtual.uid,
+      representanteEmail: usuarioAtual.email,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    msg.textContent = 'Cliente cadastrado!'; msg.style.color = 'var(--green)';
+    ['c-nome','c-doc','c-tel','c-email','c-end','c-obs'].forEach(id => document.getElementById(id).value = '');
+    setTimeout(() => msg.textContent = '', 3000);
+  } catch(e) { msg.textContent = 'Erro ao salvar.'; msg.style.color = 'var(--danger)'; }
+}
+
+function renderClientes(docs) {
+  clientesCache = docs;
+  const tbody = document.getElementById('tabela-clientes');
+  const msg = document.getElementById('msg-clientes-lista');
+  if (docs.length === 0) { tbody.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  tbody.innerHTML = docs.map(d =>
+    `<tr><td>${d.nome}</td><td>${d.cpfCnpj||'—'}</td><td>${d.telefone||'—'}</td><td>${d.endereco||'—'}</td></tr>`
+  ).join('');
+  // Atualiza select no pedido
+  const sel = document.getElementById('pedido-cliente');
+  sel.innerHTML = '<option value="">— Selecione —</option>' + docs.map(d =>
+    `<option value="${d.id}">${d.nome}</option>`
+  ).join('');
+}
+
+document.getElementById('pedido-cliente').addEventListener('change', function() {
+  const c = clientesCache.find(x => x.id === this.value);
+  const info = document.getElementById('info-cliente');
+  if (c) info.textContent = `${c.telefone||''} ${c.endereco ? '· '+c.endereco : ''}`;
+  else info.textContent = '';
+});
+
+// PEDIDO
+function renderProdutosPedido(docs) {
+  produtosCache = docs;
+  const el = document.getElementById('lista-produtos-pedido');
+  el.innerHTML = docs.map(d =>
+    `<div class="produto-card">
+      <div class="produto-card-info">
+        <strong>${d.nome}</strong>
+        <span>${d.categoria}${d.sabor ? ' · '+d.sabor : ''} · R$ ${d.preco.toFixed(2)}</span>
+      </div>
+      <div class="produto-card-right">
+        <input type="number" class="qty-input" id="qty-${d.id}" value="1" min="1" max="${d.estoque}">
+        <button class="btn-sm" onclick="addCarrinho('${d.id}')" ${d.estoque===0?'disabled':''}>
+          ${d.estoque===0?'Sem estoque':'+ Add'}
+        </button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function addCarrinho(prodId) {
+  const prod = produtosCache.find(p => p.id === prodId);
+  const qty = parseInt(document.getElementById('qty-'+prodId).value) || 1;
+  const existing = carrinho.find(i => i.id === prodId);
+  if (existing) existing.quantidade += qty;
+  else carrinho.push({ id: prodId, nome: prod.nome, preco: prod.preco, custo: prod.custo, quantidade: qty });
+  renderCarrinho();
+}
+
+function removerCarrinho(idx) {
+  carrinho.splice(idx, 1);
+  renderCarrinho();
+}
+
+function renderCarrinho() {
+  const el = document.getElementById('carrinho');
+  if (carrinho.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;">Adicione produtos ao pedido</div>';
+    return;
+  }
+  const total = carrinho.reduce((s,i) => s + i.preco * i.quantidade, 0);
+  el.innerHTML = carrinho.map((item, idx) =>
+    `<div class="carrinho-item">
+      <span>${item.nome} <span style="color:var(--muted)">× ${item.quantidade}</span></span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'DM Mono',monospace">R$ ${(item.preco*item.quantidade).toFixed(2)}</span>
+        <button class="btn-rm" onclick="removerCarrinho(${idx})">×</button>
+      </span>
+    </div>`
+  ).join('') + `<div class="carrinho-total">Total: R$ ${total.toFixed(2)}</div>`;
+}
+
+async function confirmarPedido() {
+  const clienteId = document.getElementById('pedido-cliente').value;
+  const obs = document.getElementById('pedido-obs').value;
+  const msg = document.getElementById('msg-pedido');
+  if (!clienteId) { msg.textContent = 'Selecione um cliente.'; msg.style.color = 'var(--danger)'; return; }
+  if (carrinho.length === 0) { msg.textContent = 'Adicione pelo menos um produto.'; msg.style.color = 'var(--danger)'; return; }
+  const cliente = clientesCache.find(c => c.id === clienteId);
+  const total = carrinho.reduce((s,i) => s + i.preco * i.quantidade, 0);
+  const custo = carrinho.reduce((s,i) => s + i.custo * i.quantidade, 0);
+  const lucro = total - custo;
+  const itens = carrinho.map(i => ({
+    id: i.id, nome: i.nome, preco: i.preco, custo: i.custo,
+    quantidade: i.quantidade, subtotal: i.preco*i.quantidade,
+    custoSubtotal: i.custo*i.quantidade
+  }));
+  try {
+    const batch = db.batch();
+    const pedRef = db.collection('pedidos').doc();
+    batch.set(pedRef, {
+      clienteId, clienteNome: cliente.nome,
+      representanteId: usuarioAtual.uid, representanteEmail: usuarioAtual.email,
+      itens, total, custo, lucro, observacoes: obs, status: 'Confirmado',
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // Atualizar estoque
+    itens.forEach(item => {
+      const prodRef = db.collection('produtos').doc(item.id);
+      batch.update(prodRef, { estoque: firebase.firestore.FieldValue.increment(-item.quantidade) });
+    });
+    await batch.commit();
+    carrinho = [];
+    renderCarrinho();
+    document.getElementById('pedido-cliente').value = '';
+    document.getElementById('pedido-obs').value = '';
+    document.getElementById('info-cliente').textContent = '';
+    msg.textContent = '✓ Pedido confirmado com sucesso!'; msg.style.color = 'var(--green)';
+    setTimeout(() => msg.textContent = '', 4000);
+  } catch(e) { msg.textContent = 'Erro ao confirmar pedido.'; msg.style.color = 'var(--danger)'; }
+}
+
+function renderMeusPedidos(docs) {
+  const tbody = document.getElementById('tabela-meus-pedidos');
+  const msg = document.getElementById('msg-meus-pedidos');
+  if (docs.length === 0) { tbody.innerHTML=''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  tbody.innerHTML = docs.map(d => {
+    const data = d.criadoEm ? new Date(d.criadoEm.seconds*1000).toLocaleDateString('pt-BR') : '—';
+    const itens = (d.itens||[]).map(i => `${i.nome} ×${i.quantidade}`).join(', ');
+    return `<tr>
+      <td>${d.clienteNome}</td>
+      <td style="font-size:12px;color:var(--muted)">${itens}</td>
+      <td style="font-family:'DM Mono',monospace">R$ ${(d.total||0).toFixed(2)}</td>
+      <td>${data}</td>
+      <td><span class="badge badge-green">${d.status||'Confirmado'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function iniciar() {
+  db.collection('produtos').orderBy('nome').onSnapshot(snap => {
+    const docs = snap.docs.map(d => ({id:d.id,...d.data()}));
+    renderEstoque(docs);
+    renderProdutosPedido(docs);
+  });
+  db.collection('clientes').orderBy('nome').onSnapshot(snap => {
+    renderClientes(snap.docs.map(d => ({id:d.id,...d.data()})));
+  });
+  db.collection('pedidos')
+    .where('representanteId','==', usuarioAtual ? usuarioAtual.uid : '')
+    .orderBy('criadoEm','desc')
+    .onSnapshot(snap => {
+      renderMeusPedidos(snap.docs.map(d => ({id:d.id,...d.data()})));
+    });
+}// ============================================================
+// DEMONSTRATIVO DO MÊS
+// ============================================================
+async function calcularDemonstrativoRep(mes) {
+  if (!usuarioAtual) return;
+  const [ano, m] = mes.split('-').map(Number);
+  const inicio = new Date(ano, m - 1, 1);
+  const fim = new Date(ano, m, 1);
+
+  // Buscar pedidos do representante no mês
+  const snapPedidos = await db.collection('pedidos')
+    .where('representanteId', '==', usuarioAtual.uid)
+    .where('criadoEm', '>=', firebase.firestore.Timestamp.fromDate(inicio))
+    .where('criadoEm', '<', firebase.firestore.Timestamp.fromDate(fim))
+    .get();
+  const pedidos = snapPedidos.docs.map(d => ({id: d.id, ...d.data()}));
+
+  // Buscar percentual de comissão
+  const snapComissao = await db.collection('comissoes').doc(usuarioAtual.email.toLowerCase()).get();
+  const pct = snapComissao.exists ? snapComissao.data().percentual : 0;
+
+  const totalVendas = pedidos.reduce((s, p) => s + (p.total || 0), 0);
+  const comissao = totalVendas * (pct / 100);
+  const nomeMes = inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const cards = document.getElementById('demo-rep-cards');
+  const tabela = document.getElementById('demo-rep-tabela');
+
+  cards.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px">
+      <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Pedidos em ${nomeMes}</div>
+      <div style="font-size:28px;font-weight:600;margin-top:6px;font-family:'DM Mono',monospace">${pedidos.length}</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px">
+      <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Total de vendas</div>
+      <div style="font-size:28px;font-weight:600;margin-top:6px;font-family:'DM Mono',monospace">R$ ${totalVendas.toFixed(2)}</div>
+    </div>
+    <div style="background:var(--accent);border-radius:10px;padding:18px">
+      <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.06em">Sua comissão (${pct}%)</div>
+      <div style="font-size:28px;font-weight:600;margin-top:6px;font-family:'DM Mono',monospace;color:white">R$ ${comissao.toFixed(2)}</div>
+    </div>`;
+
+  if (pedidos.length === 0) {
+    tabela.innerHTML = '<div class="msg">Nenhum pedido encontrado neste mês.</div>';
+    return;
+  }
+
+  tabela.innerHTML = `
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;margin-top:4px">Pedidos do período</div>
+    <table>
+      <thead><tr><th>Cliente</th><th>Itens</th><th>Valor total</th><th>Comissão (${pct}%)</th><th>Data</th></tr></thead>
+      <tbody>${pedidos.map(p => {
+        const data = p.criadoEm ? new Date(p.criadoEm.seconds * 1000).toLocaleDateString('pt-BR') : '—';
+        const itens = (p.itens || []).map(i => `${i.nome} ×${i.quantidade}`).join(', ');
+        const comissaoPedido = (p.total || 0) * (pct / 100);
+        return `<tr>
+          <td>${p.clienteNome}</td>
+          <td style="font-size:12px;color:var(--muted)">${itens}</td>
+          <td style="font-family:'DM Mono',monospace">R$ ${(p.total||0).toFixed(2)}</td>
+          <td style="font-family:'DM Mono',monospace;color:var(--accent);font-weight:500">R$ ${comissaoPedido.toFixed(2)}</td>
+          <td>${data}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const hoje = new Date();
+  const mesAtual = hoje.toISOString().slice(0, 7);
+  const inputMes = document.getElementById('mes-demo-rep');
+  if (inputMes) {
+    inputMes.value = mesAtual;
+    inputMes.addEventListener('change', e => calcularDemonstrativoRep(e.target.value));
+  }
+});
+</script>
+</body>
+</html>

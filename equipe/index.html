@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipe — Pedidos e Clientes</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e8e8e4;
+    --text: #1a1a18;
+    --muted: #888880;
+    --accent: #5a3e6b;
+    --accent-light: #f2eef8;
+    --accent-mid: #7a5a8f;
+    --danger: #c0392b;
+    --danger-light: #fdf0ee;
+    --green: #2d5a27;
+    --green-light: #eaf2e8;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+  .login-logo { font-size: 13px; font-weight: 500; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .login-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .field input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; font-size: 14px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .field input:focus { border-color: var(--accent); }
+  .btn-primary { width: 100%; padding: 11px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn-primary:hover { background: var(--accent-mid); }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center; }
+
+  #app { display: none; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 0; display: flex; flex-direction: column; z-index: 10; }
+  .sidebar-brand { padding: 0 20px 24px; border-bottom: 1px solid var(--border); }
+  .sidebar-brand .tag { font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; }
+  .sidebar-brand .name { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .sidebar-brand .role { font-size: 12px; color: var(--muted); }
+  .sidebar-nav { padding: 16px 12px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); transition: all 0.15s; margin-bottom: 2px; }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid var(--border); }
+  .btn-logout { width: 100%; padding: 9px; background: none; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+  .page-header { margin-bottom: 28px; }
+  .page-title { font-size: 20px; font-weight: 600; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 24px; }
+  .section-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-title { font-size: 14px; font-weight: 600; }
+  .section-body { padding: 20px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 10px; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 12px 0; vertical-align: middle; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-purple { background: var(--accent-light); color: var(--accent); }
+
+  .pedido-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .pedido-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .pedido-card-cliente { font-size: 14px; font-weight: 600; }
+  .pedido-card-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pedido-card-valor { font-size: 16px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .pedido-itens { background: var(--bg); border-radius: 6px; padding: 12px; }
+  .pedido-item { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .pedido-item:last-child { border-bottom: none; }
+
+  .cliente-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 8px; }
+  .cliente-nome { font-size: 14px; font-weight: 600; }
+  .cliente-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .cliente-field { font-size: 12px; }
+  .cliente-field span { color: var(--muted); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .search-bar { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--bg); color: var(--text); outline: none; margin-bottom: 16px; }
+  .search-bar:focus { border-color: var(--accent); }
+
+  .hidden { display: none !important; }
+  .msg { font-size: 13px; color: var(--muted); text-align: center; padding: 24px; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; }
+    .sidebar-brand, .nav-item span, .sidebar-footer { display: none; }
+    .main { margin-left: 60px; padding: 20px; }
+    .cliente-info { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⬡ Sistema</div>
+    <div class="login-title">Painel Equipe</div>
+    <div class="login-sub">Visualização de pedidos e clientes</div>
+    <div class="field"><label>E-mail</label><input type="email" id="login-email" placeholder="seu@email.com"></div>
+    <div class="field"><label>Senha</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+    <button class="btn-primary" onclick="fazerLogin()">Entrar</button>
+    <div class="login-error hidden" id="login-error"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="tag">⬡ Equipe</div>
+      <div class="name">Equipe</div>
+      <div class="role" id="user-email-display"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="mostrarPagina('pedidos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Pedidos</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('clientes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Clientes</span>
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('demonstrativo')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        <span>Demonstrativo</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <!-- PEDIDOS -->
+    <div id="pg-pedidos">
+      <div class="page-header">
+        <div class="page-title">Pedidos</div>
+        <div class="page-sub">Todos os pedidos lançados pelos representantes</div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Lista de pedidos</div>
+          <span id="contador-pedidos" style="font-size:13px;color:var(--muted)"></span>
+        </div>
+        <div class="section-body">
+          <input class="search-bar" id="busca-pedido" placeholder="Buscar por cliente ou representante..." oninput="filtrarPedidos()">
+          <div id="lista-pedidos"></div>
+          <div class="msg hidden" id="msg-pedidos">Nenhum pedido ainda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div id="pg-clientes" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Clientes</div>
+        <div class="page-sub">Dados cadastrais de todos os clientes</div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Base de clientes</div>
+          <span id="contador-clientes" style="font-size:13px;color:var(--muted)"></span>
+        </div>
+        <div class="section-body">
+          <input class="search-bar" id="busca-cliente" placeholder="Buscar por nome, CPF ou telefone..." oninput="filtrarClientes()">
+          <div id="lista-clientes"></div>
+          <div class="msg hidden" id="msg-clientes">Nenhum cliente cadastrado.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMONSTRATIVO -->
+    <div id="pg-demonstrativo" class="hidden">
+      <div class="page-header">
+        <div class="page-title">Demonstrativo do Mês</div>
+        <div class="page-sub">Vendas e comissão dos representantes por período</div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Selecione o mês</div>
+          <input type="month" id="mes-demo-equipe" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);outline:none;cursor:pointer">
+        </div>
+        <div class="section-body">
+          <div id="demo-equipe-conteudo">
+            <div class="msg">Selecione um mês para exibir o demonstrativo.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "COLE_SUA_API_KEY",
+  authDomain: "COLE_SEU_AUTH_DOMAIN",
+  projectId: "COLE_SEU_PROJECT_ID",
+  storageBucket: "COLE_SEU_STORAGE_BUCKET",
+  messagingSenderId: "COLE_SEU_MESSAGING_ID",
+  appId: "COLE_SEU_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let todosPedidos = [];
+let todosClientes = [];
+
+function fazerLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(() => {
+      document.getElementById('login-error').textContent = 'E-mail ou senha inválidos.';
+      document.getElementById('login-error').classList.remove('hidden');
+    });
+}
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') fazerLogin(); });
+function sair() { auth.signOut(); }
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    const snap = await db.collection('usuarios').doc(user.uid).get();
+    if (!snap.exists || snap.data().perfil !== 'equipe') {
+      alert('Acesso negado. Este painel é exclusivo para a equipe.');
+      auth.signOut(); return;
+    }
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('user-email-display').textContent = user.email;
+    iniciar();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+function mostrarPagina(id) {
+  ['pedidos','clientes','demonstrativo'].forEach(p => document.getElementById('pg-'+p).classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.remove('hidden');
+  event.currentTarget.classList.add('active');
+  if (id === 'demonstrativo') {
+    const mes = document.getElementById('mes-demo-equipe').value;
+    if (mes) calcularDemonstrativoEquipe(mes);
+  }
+}
+
+function renderPedidos(docs) {
+  const el = document.getElementById('lista-pedidos');
+  const msg = document.getElementById('msg-pedidos');
+  document.getElementById('contador-pedidos').textContent = docs.length + ' pedido(s)';
+  if (docs.length === 0) { el.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  el.innerHTML = docs.map(d => {
+    const data = d.criadoEm ? new Date(d.criadoEm.seconds*1000).toLocaleDateString('pt-BR') : '—';
+    const itens = (d.itens||[]).map(i =>
+      `<div class="pedido-item">
+        <span>${i.nome} <span style="color:var(--muted)">× ${i.quantidade}</span></span>
+        <span style="font-family:'DM Mono',monospace">R$ ${(i.subtotal||0).toFixed(2)}</span>
+      </div>`
+    ).join('');
+    return `<div class="pedido-card">
+      <div class="pedido-card-header">
+        <div>
+          <div class="pedido-card-cliente">${d.clienteNome}</div>
+          <div class="pedido-card-meta">Rep.: ${d.representanteEmail||'—'} · ${data}</div>
+          ${d.observacoes ? `<div class="pedido-card-meta" style="margin-top:4px">Obs: ${d.observacoes}</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          <div class="pedido-card-valor">R$ ${(d.total||0).toFixed(2)}</div>
+          <span class="badge badge-green" style="margin-top:4px">${d.status||'Confirmado'}</span>
+        </div>
+      </div>
+      <div class="pedido-itens">${itens}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderClientes(docs) {
+  const el = document.getElementById('lista-clientes');
+  const msg = document.getElementById('msg-clientes');
+  document.getElementById('contador-clientes').textContent = docs.length + ' cliente(s)';
+  if (docs.length === 0) { el.innerHTML = ''; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  el.innerHTML = docs.map(d =>
+    `<div class="cliente-card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="cliente-nome">${d.nome}</div>
+        <span class="badge badge-purple">${d.representanteEmail||'—'}</span>
+      </div>
+      <div class="cliente-info">
+        <div class="cliente-field"><span>CPF / CNPJ</span>${d.cpfCnpj||'—'}</div>
+        <div class="cliente-field"><span>Telefone</span>${d.telefone||'—'}</div>
+        <div class="cliente-field"><span>E-mail</span>${d.email||'—'}</div>
+        <div class="cliente-field"><span>Endereço</span>${d.endereco||'—'}</div>
+        ${d.observacoes ? `<div class="cliente-field" style="grid-column:1/-1"><span>Observações</span>${d.observacoes}</div>` : ''}
+      </div>
+    </div>`
+  ).join('');
+}
+
+function filtrarPedidos() {
+  const q = document.getElementById('busca-pedido').value.toLowerCase();
+  const filtrados = todosPedidos.filter(d =>
+    d.clienteNome.toLowerCase().includes(q) || (d.representanteEmail||'').toLowerCase().includes(q)
+  );
+  renderPedidos(filtrados);
+}
+
+function filtrarClientes() {
+  const q = document.getElementById('busca-cliente').value.toLowerCase();
+  const filtrados = todosClientes.filter(d =>
+    d.nome.toLowerCase().includes(q) ||
+    (d.cpfCnpj||'').toLowerCase().includes(q) ||
+    (d.telefone||'').toLowerCase().includes(q)
+  );
+  renderClientes(filtrados);
+}
+
+function iniciar() {
+  db.collection('pedidos').orderBy('criadoEm','desc').onSnapshot(snap => {
+    todosPedidos = snap.docs.map(d => ({id:d.id,...d.data()}));
+    renderPedidos(todosPedidos);
+  });
+  db.collection('clientes').orderBy('nome').onSnapshot(snap => {
+    todosClientes = snap.docs.map(d => ({id:d.id,...d.data()}));
+    renderClientes(todosClientes);
+  });
+}// ============================================================
+// DEMONSTRATIVO DO MÊS
+// ============================================================
+async function calcularDemonstrativoEquipe(mes) {
+  const [ano, m] = mes.split('-').map(Number);
+  const inicio = new Date(ano, m - 1, 1);
+  const fim = new Date(ano, m, 1);
+  const nomeMes = inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const el = document.getElementById('demo-equipe-conteudo');
+  el.innerHTML = '<div class="msg">Carregando...</div>';
+
+  // Buscar pedidos do mês
+  const snapPedidos = await db.collection('pedidos')
+    .where('criadoEm', '>=', firebase.firestore.Timestamp.fromDate(inicio))
+    .where('criadoEm', '<', firebase.firestore.Timestamp.fromDate(fim))
+    .get();
+  const pedidos = snapPedidos.docs.map(d => ({...d.data()}));
+
+  // Buscar todas as comissões configuradas
+  const snapComissoes = await db.collection('comissoes').get();
+  const comissoesMap = {};
+  snapComissoes.docs.forEach(d => { comissoesMap[d.id] = d.data().percentual; });
+
+  // Agrupar por representante
+  const porRep = {};
+  pedidos.forEach(p => {
+    const email = (p.representanteEmail || 'desconhecido').toLowerCase();
+    if (!porRep[email]) porRep[email] = { total: 0, pedidos: 0 };
+    porRep[email].total += p.total || 0;
+    porRep[email].pedidos += 1;
+  });
+
+  if (Object.keys(porRep).length === 0) {
+    el.innerHTML = `<div class="msg">Nenhum pedido encontrado em ${nomeMes}.</div>`;
+    return;
+  }
+
+  el.innerHTML = Object.entries(porRep).map(([email, dados]) => {
+    const pct = comissoesMap[email] || 0;
+    const comissao = dados.total * (pct / 100);
+    return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:600">${email}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${nomeMes} · ${dados.pedidos} pedido(s)</div>
+        </div>
+        <span class="badge ${pct > 0 ? 'badge-green' : 'badge-purple'}">${pct > 0 ? pct + '% de comissão' : 'Sem comissão definida'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Pedidos</div>
+          <div style="font-size:22px;font-weight:600;margin-top:4px;font-family:'DM Mono',monospace">${dados.pedidos}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Total de vendas</div>
+          <div style="font-size:22px;font-weight:600;margin-top:4px;font-family:'DM Mono',monospace">R$ ${dados.total.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--accent);border-radius:8px;padding:14px">
+          <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.06em">Comissão (${pct}%)</div>
+          <div style="font-size:22px;font-weight:600;margin-top:4px;font-family:'DM Mono',monospace;color:white">R$ ${comissao.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const hoje = new Date();
+  const mesAtual = hoje.toISOString().slice(0, 7);
+  const inputMes = document.getElementById('mes-demo-equipe');
+  if (inputMes) {
+    inputMes.value = mesAtual;
+    inputMes.addEventListener('change', e => calcularDemonstrativoEquipe(e.target.value));
+  }
+});
+</script>
+</body>
+</html>
